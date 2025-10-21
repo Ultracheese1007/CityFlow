@@ -1,0 +1,93 @@
+version: "3.9"
+
+services:
+  hm-dianping-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hm-dianping-app
+    restart: unless-stopped
+    ports:
+      - "18080:18080"
+    depends_on:
+      mysql:
+        condition: service_healthy   # ✅ 等待MySQL健康检查通过再启动
+      redis:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+
+      # ✅ 统一数据库环境变量（与 application.yml 配合）
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: hmdp
+      MYSQL_USER: root
+      MYSQL_PASSWORD: leah198705
+
+      # ✅ Redis 配置
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: leah198705
+    networks:
+      - hm-dianping
+
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: leah198705
+      MYSQL_DATABASE: hmdp
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - hm-dianping
+    healthcheck:                       # ✅ 健康检查，防止 app 过早连接
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "leah198705"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - hm-dianping
+    healthcheck:                       # ✅ Redis健康检查（可选）
+      test: ["CMD", "redis-cli", "-a", "leah198705", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    restart: unless-stopped
+    ports:
+      - "18081:80"
+    volumes:
+      - ./ops/nginx/conf/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ops/nginx/conf/mime.types:/etc/nginx/mime.types:ro
+      - ./ops/nginx/conf/conf.d:/etc/nginx/conf.d:ro
+      - ./ops/nginx/html:/usr/share/nginx/html:ro
+      - ./ops/nginx/logs:/var/log/nginx
+    depends_on:
+      - hm-dianping-app
+    networks:
+      - hm-dianping
+
+volumes:
+  mysql_data:
+  redis_data:
+
+networks:
+  hm-dianping:
+    driver: bridge
