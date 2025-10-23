@@ -1,26 +1,33 @@
-package com.hmdp.controller;
+package com.hmdp.web;
 
 
 import com.hmdp.dto.Result;
 import com.hmdp.entity.Voucher;
-import com.hmdp.service.IVoucherService;
+import com.hmdp.repository.VoucherRepository;
+import com.hmdp.service.VoucherService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
-import javax.annotation.Resource;
 
-/**
- * <p>
- *  前端控制器
- * </p>
- *
- * @author 虎哥
- */
 @RestController
 @RequestMapping("/voucher")
+@RequiredArgsConstructor
 public class VoucherController {
 
-    @Resource
-    private IVoucherService voucherService;
+    private final VoucherRepository voucherRepository;
+    private final VoucherService voucherService;
+
+    /**
+     * 新增普通券
+     * @param voucher 优惠券信息
+     * @return 优惠券id
+     */
+    @PostMapping
+    public Result addVoucher(@RequestBody Voucher voucher) {
+        Long id = voucherService.addVoucher(voucher);
+        return Result.ok(id);
+    }
+
 
     /**
      * 新增秒杀券
@@ -34,24 +41,12 @@ public class VoucherController {
     }
 
     /**
-     * 新增普通券
-     * @param voucher 优惠券信息
-     * @return 优惠券id
-     */
-    @PostMapping
-    public Result addVoucher(@RequestBody Voucher voucher) {
-        voucherService.save(voucher);
-        return Result.ok(voucher.getId());
-    }
-
-
-    /**
      * 查询店铺的优惠券列表
      * @param shopId 店铺id
      * @return 优惠券列表
      */
     @GetMapping("/list/{shopId}")
     public Result queryVoucherOfShop(@PathVariable("shopId") Long shopId) {
-       return voucherService.queryVoucherOfShop(shopId);
+        return voucherService.queryVoucherOfShop(shopId);
     }
 }

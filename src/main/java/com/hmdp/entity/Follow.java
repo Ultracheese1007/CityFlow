@@ -1,50 +1,38 @@
 package com.hmdp.entity;
 
-import com.baomidou.mybatisplus.annotation.TableName;
-import com.baomidou.mybatisplus.annotation.IdType;
-import java.time.LocalDateTime;
-import com.baomidou.mybatisplus.annotation.TableId;
-import java.io.Serializable;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.experimental.Accessors;
+import org.hibernate.annotations.CreationTimestamp;
 
-/**
- * <p>
- * 
- * </p>
- *
- * @author 虎哥
- * @since 2021-12-22
- */
+import javax.persistence.*;
+import java.io.Serializable;
+import java.time.LocalDateTime;
+
 @Data
 @EqualsAndHashCode(callSuper = false)
 @Accessors(chain = true)
-@TableName("tb_follow")
+@Entity
+@Table(name = "tb_follow")
 public class Follow implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    /**
-     * 主键
-     */
-    @TableId(value = "id", type = IdType.AUTO)
+    /** 主键 */
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY) // MySQL 自增
     private Long id;
 
-    /**
-     * 用户id
-     */
+    /** 用户id */
+    @Column(name = "user_id")
     private Long userId;
 
-    /**
-     * 关联的用户id
-     */
+    /** 关联的用户id */
+    @Column(name = "follow_user_id")
     private Long followUserId;
 
-    /**
-     * 创建时间
-     */
+    /** 创建时间 */
+    @CreationTimestamp
+    @Column(name = "create_time")
     private LocalDateTime createTime;
-
-
 }

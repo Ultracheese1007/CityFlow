@@ -1,28 +1,23 @@
 package com.hmdp.entity;
 
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.experimental.Accessors;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
+import javax.persistence.*;
 import java.io.Serializable;
 import java.time.LocalDateTime;
 
 /**
- * <p>
- * 
- * </p>
- *
- * @author 虎哥
- * @since 2021-12-22
+ * Blog 实体
  */
 @Data
 @EqualsAndHashCode(callSuper = false)
 @Accessors(chain = true)
-@TableName("tb_blog")
+@Entity
+@Table(name = "tb_blog")
 public class Blog implements Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -30,30 +25,38 @@ public class Blog implements Serializable {
     /**
      * 主键
      */
-    @TableId(value = "id", type = IdType.AUTO)
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY) // MySQL 自增主键
     private Long id;
+
     /**
      * 商户id
      */
+    @Column(name = "shop_id")
     private Long shopId;
+
     /**
      * 用户id
      */
+    @Column(name = "user_id")
     private Long userId;
+
     /**
-     * 用户图标
+     * 用户图标（业务临时字段，不持久化）
      */
-    @TableField(exist = false)
+    @Transient
     private String icon;
+
     /**
-     * 用户姓名
+     * 用户姓名（业务临时字段，不持久化）
      */
-    @TableField(exist = false)
+    @Transient
     private String name;
+
     /**
-     * 是否点赞过了
+     * 是否点赞过了（业务临时字段，不持久化）
      */
-    @TableField(exist = false)
+    @Transient
     private Boolean isLike;
 
     /**
@@ -84,12 +87,14 @@ public class Blog implements Serializable {
     /**
      * 创建时间
      */
+    @CreationTimestamp
+    @Column(name = "create_time")
     private LocalDateTime createTime;
 
     /**
      * 更新时间
      */
+    @UpdateTimestamp
+    @Column(name = "update_time")
     private LocalDateTime updateTime;
-
-
 }

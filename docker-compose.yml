@@ -31,24 +31,26 @@ services:
     networks:
       - hm-dianping
 
+
   mysql:
     image: mysql:8.0
     container_name: mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: leah198705
-      MYSQL_DATABASE: hmdp
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
     ports:
-      - "3306:3306"
+      - "${MYSQL_PORT:-3306}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     networks:
       - hm-dianping
-    healthcheck:                       # ✅ 健康检查，防止 app 过早连接
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
       interval: 10s
       timeout: 5s
       retries: 5
+
 
   redis:
     image: redis:7-alpine

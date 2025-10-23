@@ -1,61 +1,57 @@
 package com.hmdp.entity;
 
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.experimental.Accessors;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
+import javax.persistence.*;
 import java.io.Serializable;
 import java.time.LocalDateTime;
 
 /**
- * <p>
  * 秒杀优惠券表，与优惠券是一对一关系
- * </p>
- *
- * @author 虎哥
- * @since 2022-01-04
  */
 @Data
 @EqualsAndHashCode(callSuper = false)
 @Accessors(chain = true)
-@TableName("tb_seckill_voucher")
+@Entity
+@Table(name = "tb_seckill_voucher")
 public class SeckillVoucher implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    /**
-     * 关联的优惠券的id
-     */
-    @TableId(value = "voucher_id", type = IdType.INPUT)
+    /** 关联的优惠券id（主键，同时也是外键） */
+    @Id
+    @Column(name = "voucher_id")
     private Long voucherId;
 
-    /**
-     * 库存
-     */
+    // SeckillVoucher
+    @OneToOne(fetch = FetchType.LAZY)
+    @MapsId
+    @JoinColumn(name = "voucher_id")
+    private Voucher voucher;
+
+    /** 库存 */
     private Integer stock;
 
-    /**
-     * 创建时间
-     */
+    /** 创建时间 */
+    @CreationTimestamp
+    @Column(name = "create_time")
     private LocalDateTime createTime;
 
-    /**
-     * 生效时间
-     */
+    /** 生效时间 */
+    @Column(name = "begin_time")
     private LocalDateTime beginTime;
 
-    /**
-     * 失效时间
-     */
+    /** 失效时间 */
+    @Column(name = "end_time")
     private LocalDateTime endTime;
 
-    /**
-     * 更新时间
-     */
+    /** 更新时间 */
+    @UpdateTimestamp
+    @Column(name = "update_time")
     private LocalDateTime updateTime;
-
 
 }

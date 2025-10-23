@@ -1,4 +1,4 @@
-package com.hmdp.controller;
+package com.hmdp.web;
 
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.StrUtil;

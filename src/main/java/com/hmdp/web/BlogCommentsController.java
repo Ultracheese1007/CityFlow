@@ -1,4 +1,4 @@
-package com.hmdp.controller;
+package com.hmdp.web;
 
 
 import org.springframework.web.bind.annotation.RequestMapping;

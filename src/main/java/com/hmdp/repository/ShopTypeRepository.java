@@ -1,4 +1,7 @@
 package com.hmdp.repository;
 
-public class ShopTypeRepository {
+import com.hmdp.entity.ShopType;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface ShopTypeRepository extends JpaRepository<ShopType, Long> {
 }

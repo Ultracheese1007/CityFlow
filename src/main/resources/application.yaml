@@ -28,7 +28,16 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: none
+      ddl-auto: none # 关闭 Hibernate DDL 建表，交给 Flyway
+    open-in-view: false
+    # 命名策略 —— 针对 Spring Boot 2.7 + Hibernate 5.x
+    properties:
+      # Spring 的物理命名策略：把 Java 的 camelCase -> 数据库 snake_case（小写加下划线）
+      hibernate.physical_naming_strategy: org.springframework.boot.orm.jpa.hibernate.SpringPhysicalNamingStrategy
+      # Spring 的隐式命名策略：没写 @Table/@Column 时的默认命名更符合 Spring 习惯
+      hibernate.implicit_naming_strategy: org.springframework.boot.orm.jpa.hibernate.SpringImplicitNamingStrategy
+      # 时区（可选，推荐）：JDBC 层统一用 UTC，避免跨时区错位
+      hibernate.jdbc.time_zone: UTC
 
   flyway:
     enabled: true
@@ -38,8 +47,16 @@ spring:
     validate-on-migrate: true
     clean-disabled: true
 
-mybatis-plus:
-  type-aliases-package: com.hmdp.entity
+  jwt:
+    secret: "CHANGE_ME_TO_A_LONG_RANDOM_SECRET_64+_CHARS"
+    access-ttl-minutes: 30
+    refresh-ttl-days: 14
+    refresh-cookie-name: "REFRESH_TOKEN"
+    cookie-domain: ""        # 本地留空；生产填你的域名
+    cookie-secure: false     # 本地 false；生产 true
+    cookie-same-site: "Lax"
+
+
 
 logging:
   level:
