@@ -3,8 +3,10 @@ name: CI Build & Push
 on:
   push:
     branches: [ main ]
-  pull_request:
-    branches: [ main ]
+
+permissions:
+  contents: read
+  packages: write   # 💡 必须加这行
 
 jobs:
   build:
@@ -34,10 +36,8 @@ jobs:
         env:
           IMAGE: ghcr.io/${{ github.repository }}
           SHA: ${{ github.sha }}
-
         run: |
-          IMAGE_LC=$(echo "$IMAGE" | tr '[:upper:]' '[:lower:]')  # 转小写
+          IMAGE_LC=$(echo "$IMAGE" | tr '[:upper:]' '[:lower:]')
           docker build -t $IMAGE_LC:latest -t $IMAGE_LC:$SHA .
           docker push $IMAGE_LC:latest
           docker push $IMAGE_LC:$SHA
-
