@@ -1,0 +1,17 @@
+# 忽略所有隐藏文件（包括 .git、.idea、.vscode 等）
+.*
+!.dockerignore
+# 忽略所有 target 下的中间文件，只保留最终 .jar
+target/*
+!target/*.jar
+# 忽略源代码和构建环境文件（镜像只需要 .jar）
+src/
+.idea/
+*.iml
+*.log
+# 忽略 node_modules（如果你用了前端）
+node_modules/
+# 忽略数据库脚本等只在构建阶段用的本地目录
+db/
+.env
+Dockerfile

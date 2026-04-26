@@ -1,0 +1,51 @@
+version: "3.9"
+
+services:
+  cityflow-app:
+    image: ghcr.io/ultracheese1007/cityflow:latest     # ✅ 直接使用 GHCR 镜像
+    container_name: cityflow-app
+    restart: unless-stopped
+    ports:
+      - "8080:18080"                                   # EC2外部8080 → 容器内部18080
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+
+      # ✅ 使用 AWS RDS 作为数据库
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-cityflow}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: ${RDS_USER}
+      SPRING_DATASOURCE_PASSWORD: ${RDS_PASSWORD}
+
+      # ✅ Redis 配置（可在本地容器或 AWS ElasticCache）
+      SPRING_REDIS_HOST: ${REDIS_HOST:-redis}
+      SPRING_REDIS_PORT: ${REDIS_PORT:-6379}
+      SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD:-change_me}
+
+    depends_on:
+      redis:
+        condition: service_started
+    networks:
+      - cityflow
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-change_me}"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - cityflow
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-change_me}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  redis_data:
+
+networks:
+  cityflow:
+    driver: bridge

@@ -1,0 +1,64 @@
+# =========================
+# Build artifacts
+# =========================
+target/
+build/
+dist/
+
+# Maven wrapper jar should stay
+!.mvn/wrapper/maven-wrapper.jar
+
+# =========================
+# Spring / STS
+# =========================
+HELP.md
+.apt_generated
+.factorypath
+.springBeans
+.sts4-cache
+
+# =========================
+# IDE files
+# =========================
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+.classpath
+.project
+.settings/
+
+# NetBeans
+/nbproject/private/
+/nbbuild/
+/nbdist/
+/.nb-gradle/
+
+# =========================
+# OS files
+# =========================
+.DS_Store
+
+# =========================
+# Logs
+# =========================
+*.log
+logs/
+ops/nginx/logs/
+
+# =========================
+# Environment files
+# =========================
+.env
+.env.*
+!.env.example
+
+# =========================
+# Temporary files
+# =========================
+tmp/
+
+# Local legacy database dump
+src/main/resources/db/hmdp.sql
