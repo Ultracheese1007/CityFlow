@@ -14,7 +14,7 @@ spring:
   redis:
     host: ${REDIS_HOST:redis}
     port: ${REDIS_PORT:6379}
-    password: ${MYSQL_PASSWORD:change_me}
+    password: ${REDIS_PASSWORD:change_me}
     lettuce:
       pool:
         max-active: 10
