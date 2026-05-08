@@ -46,11 +46,12 @@ public class Voucher implements Serializable {
     @Column(name = "actual_value")
     private Long actualValue;
 
-    /** 优惠券类型 */
-    private Integer type;
 
-    /** 状态 */
-    private Integer status;
+    /** 优惠券类型：0 普通券；1 秒杀券 */
+    private Integer type = 0;
+
+    /** 状态：1 上架；2 下架；3 过期 */
+    private Integer status = 1;
 
     /** 库存 */
     @Transient

@@ -99,6 +99,10 @@ public class UserServiceImpl implements UserService {
         User user = new User();
         user.setPhone(phone);
         user.setNickName(USER_NICK_NAME_PREFIX + phone.substring(phone.length() - 4));
+        user.setPassword("");   // schema 里 NOT NULL DEFAULT '', service 层显式补齐
+        user.setIcon("");       // 同上
         return userRepository.save(user);
     }
+
+
 }
