@@ -56,10 +56,13 @@ spring:
     cookie-secure: false     # 本地 false；生产 true
     cookie-same-site: "Lax"
 
-
-
 logging:
   level:
     com.cityflow: debug
   pattern:
     dateformat: mm:ss.SSS
+    # 自定义控制台输出格式：插入 [%X{traceId:-}]
+    # %X{key:-default} = 从 MDC 取 key，没有则用 default（这里用空串）
+    console: "%clr(%d{${LOGGING_PATTERN_DATEFORMAT:-yyyy-MM-dd HH:mm:ss.SSS}}){faint} %clr(${LOG_LEVEL_PATTERN:-%5p}) %clr([%X{traceId:-}]){magenta} %clr(${PID:- }){magenta} %clr(---){faint} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n%wEx"
+
+

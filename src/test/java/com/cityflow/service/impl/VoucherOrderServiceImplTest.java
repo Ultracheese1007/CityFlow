@@ -17,13 +17,19 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import com.cityflow.dto.ErrorCode;
+import com.cityflow.exception.BizException;
+import com.cityflow.exception.NotFoundException;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+
+
 
 /**
  * VoucherOrderServiceImpl 单元测试
@@ -34,6 +40,9 @@ import static org.mockito.Mockito.*;
  *
  * 不覆盖：seckillVoucher 中 `new SimpleRedisLock` 与 `AopContext.currentProxy`
  * 之后的代码——这两处依赖运行时框架，留给集成测试。
+ *
+ * Phase 3 改动：失败分支从"返回 fail Result"改为"抛 BizException / NotFoundException"，
+ * 测试相应改用 assertThatThrownBy + 检查 errorCode。
  */
 @ExtendWith(MockitoExtension.class)
 class VoucherOrderServiceImplTest {
@@ -71,21 +80,22 @@ class VoucherOrderServiceImplTest {
     // ============ seckillVoucher 早期失败分支 ============
 
     @Test
-    @DisplayName("seckillVoucher：券不存在时返回 fail")
-    void seckillVoucher_voucherNotFound_returnsFail() {
+    @DisplayName("seckillVoucher：券不存在时抛 NotFoundException(VOUCHER_NOT_FOUND)")
+    void seckillVoucher_voucherNotFound_throws() {
         when(seckillVoucherRepository.findById(99L)).thenReturn(Optional.empty());
 
-        Result result = voucherOrderService.seckillVoucher(99L);
+        assertThatThrownBy(() -> voucherOrderService.seckillVoucher(99L))
+                .isInstanceOf(NotFoundException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.VOUCHER_NOT_FOUND);
 
-        assertThat(result.getSuccess()).isFalse();
-        assertThat(result.getErrorMsg()).isEqualTo("秒杀券不存在");
-        // 早期 return：库存绝不能被扣
+        // 早期 throw：库存绝不能被扣
         verify(seckillVoucherRepository, never()).decreaseStock(anyLong());
     }
 
     @Test
-    @DisplayName("seckillVoucher：未到开始时间时返回 fail")
-    void seckillVoucher_notStartedYet_returnsFail() {
+    @DisplayName("seckillVoucher：未到开始时间时抛 BizException(VOUCHER_NOT_STARTED)")
+    void seckillVoucher_notStartedYet_throws() {
         SeckillVoucher voucher = makeVoucher(
                 LocalDateTime.now().plusHours(1),    // 1 小时后才开始
                 LocalDateTime.now().plusHours(2),
@@ -93,16 +103,17 @@ class VoucherOrderServiceImplTest {
         );
         when(seckillVoucherRepository.findById(1L)).thenReturn(Optional.of(voucher));
 
-        Result result = voucherOrderService.seckillVoucher(1L);
+        assertThatThrownBy(() -> voucherOrderService.seckillVoucher(1L))
+                .isInstanceOf(BizException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.VOUCHER_NOT_STARTED);
 
-        assertThat(result.getSuccess()).isFalse();
-        assertThat(result.getErrorMsg()).isEqualTo("秒杀券尚未开始");
         verify(seckillVoucherRepository, never()).decreaseStock(anyLong());
     }
 
     @Test
-    @DisplayName("seckillVoucher：已过结束时间时返回 fail")
-    void seckillVoucher_alreadyEnded_returnsFail() {
+    @DisplayName("seckillVoucher：已过结束时间时抛 BizException(VOUCHER_ENDED)")
+    void seckillVoucher_alreadyEnded_throws() {
         SeckillVoucher voucher = makeVoucher(
                 LocalDateTime.now().minusHours(2),
                 LocalDateTime.now().minusHours(1),    // 1 小时前已结束
@@ -110,16 +121,17 @@ class VoucherOrderServiceImplTest {
         );
         when(seckillVoucherRepository.findById(1L)).thenReturn(Optional.of(voucher));
 
-        Result result = voucherOrderService.seckillVoucher(1L);
+        assertThatThrownBy(() -> voucherOrderService.seckillVoucher(1L))
+                .isInstanceOf(BizException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.VOUCHER_ENDED);
 
-        assertThat(result.getSuccess()).isFalse();
-        assertThat(result.getErrorMsg()).isEqualTo("秒杀券已结束");
         verify(seckillVoucherRepository, never()).decreaseStock(anyLong());
     }
 
     @Test
-    @DisplayName("seckillVoucher：库存为 0 时返回 fail")
-    void seckillVoucher_outOfStock_returnsFail() {
+    @DisplayName("seckillVoucher：库存为 0 时抛 BizException(STOCK_INSUFFICIENT)")
+    void seckillVoucher_outOfStock_throws() {
         SeckillVoucher voucher = makeVoucher(
                 LocalDateTime.now().minusHours(1),
                 LocalDateTime.now().plusHours(1),
@@ -127,40 +139,43 @@ class VoucherOrderServiceImplTest {
         );
         when(seckillVoucherRepository.findById(1L)).thenReturn(Optional.of(voucher));
 
-        Result result = voucherOrderService.seckillVoucher(1L);
+        assertThatThrownBy(() -> voucherOrderService.seckillVoucher(1L))
+                .isInstanceOf(BizException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.STOCK_INSUFFICIENT);
 
-        assertThat(result.getSuccess()).isFalse();
-        assertThat(result.getErrorMsg()).isEqualTo("库存不足！");
         verify(seckillVoucherRepository, never()).decreaseStock(anyLong());
     }
 
     // ============ createVoucherOrder 内部分支 ============
 
     @Test
-    @DisplayName("createVoucherOrder：用户已购买过时返回 fail，不扣库存")
-    void createVoucherOrder_alreadyBought_returnsFail() {
+    @DisplayName("createVoucherOrder：用户已购买过时抛 BizException(ALREADY_PURCHASED)，不扣库存")
+    void createVoucherOrder_alreadyBought_throws() {
         when(voucherOrderRepository.existsByUserIdAndVoucherId(1010L, 1L)).thenReturn(true);
 
-        Result result = voucherOrderService.createVoucherOrder(1L);
+        assertThatThrownBy(() -> voucherOrderService.createVoucherOrder(1L))
+                .isInstanceOf(BizException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.ALREADY_PURCHASED);
 
-        assertThat(result.getSuccess()).isFalse();
-        assertThat(result.getErrorMsg()).isEqualTo("用户已经购买过一次！");
         // 重复购买检查通过前，绝不能扣库存或写订单
         verify(seckillVoucherRepository, never()).decreaseStock(anyLong());
         verify(voucherOrderRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("createVoucherOrder：原子扣库存失败（并发卖光）时返回 fail，不写订单")
-    void createVoucherOrder_decreaseStockFails_returnsFail() {
+    @DisplayName("createVoucherOrder：原子扣库存失败（并发卖光）时抛 BizException(STOCK_INSUFFICIENT)，不写订单")
+    void createVoucherOrder_decreaseStockFails_throws() {
         when(voucherOrderRepository.existsByUserIdAndVoucherId(1010L, 1L)).thenReturn(false);
         // decreaseStock 返回 0 表示 UPDATE...WHERE stock>0 没影响任何行
         when(seckillVoucherRepository.decreaseStock(1L)).thenReturn(0);
 
-        Result result = voucherOrderService.createVoucherOrder(1L);
+        assertThatThrownBy(() -> voucherOrderService.createVoucherOrder(1L))
+                .isInstanceOf(BizException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.STOCK_INSUFFICIENT);
 
-        assertThat(result.getSuccess()).isFalse();
-        assertThat(result.getErrorMsg()).isEqualTo("库存不足！");
         // 库存扣失败：订单一定不能落库
         verify(voucherOrderRepository, never()).save(any());
     }

@@ -1,8 +1,11 @@
 package com.cityflow.service.impl;
 
+import com.cityflow.dto.ErrorCode;
 import com.cityflow.dto.Result;
 import com.cityflow.entity.SeckillVoucher;
 import com.cityflow.entity.VoucherOrder;
+import com.cityflow.exception.BizException;
+import com.cityflow.exception.NotFoundException;
 import com.cityflow.repository.SeckillVoucherRepository;
 import com.cityflow.repository.VoucherOrderRepository;
 import com.cityflow.repository.VoucherRepository;
@@ -11,6 +14,7 @@ import com.cityflow.utils.RedisIdWorker;
 import com.cityflow.utils.SimpleRedisLock;
 import com.cityflow.utils.UserHolder;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.aop.framework.AopContext;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -19,10 +23,15 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 
 /**
- * VoucherOrder 服务实现类
+ * 秒杀订单服务。
  *
- * 只保留骨架，后续可实现业务逻辑
+ * 异常处理风格：
+ *   - 业务校验失败统一抛 BizException / NotFoundException
+ *   - WebExceptionAdvice 把异常转换成 Result.fail(ErrorCode)，
+ *     带 HTTP 状态码 + 稳定的 API code 字段
+ *   - 日志由 advice 统一打（warn 级别）；这里 service 层只在关键决策点打 info/debug
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class VoucherOrderServiceImpl implements VoucherOrderService {
@@ -37,33 +46,29 @@ public class VoucherOrderServiceImpl implements VoucherOrderService {
     public Result seckillVoucher(Long voucherId) {
         SeckillVoucher voucher = seckillVoucherRepository.findById(voucherId).orElse(null);
         if (voucher == null) {
-            return Result.fail("秒杀券不存在");
+            throw new NotFoundException(ErrorCode.VOUCHER_NOT_FOUND, "voucherId=" + voucherId);
         }
         if (voucher.getBeginTime().isAfter(LocalDateTime.now())) {
-            return Result.fail("秒杀券尚未开始");
+            throw new BizException(ErrorCode.VOUCHER_NOT_STARTED);
         }
         if (voucher.getEndTime().isBefore(LocalDateTime.now())) {
-            return Result.fail("秒杀券已结束");
+            throw new BizException(ErrorCode.VOUCHER_ENDED);
         }
         if (voucher.getStock() < 1) {
-            return Result.fail("库存不足！");
+            throw new BizException(ErrorCode.STOCK_INSUFFICIENT);
         }
 
         Long userId = UserHolder.getUser().getId();
-        //创建锁对象(新增代码)
         SimpleRedisLock lock = new SimpleRedisLock("order:" + userId, stringRedisTemplate);
-        //获取锁对象
         boolean isLock = lock.tryLock(1200);
-        //加锁失败
         if (!isLock) {
-            return Result.fail("不允许重复下单");
+            log.warn("Failed to acquire seckill lock: userId={} voucherId={}", userId, voucherId);
+            throw new BizException(ErrorCode.CONCURRENT_ORDER_DENIED);
         }
         try {
-            //获取代理对象(事务)
             VoucherOrderService proxy = (VoucherOrderService) AopContext.currentProxy();
             return proxy.createVoucherOrder(voucherId);
         } finally {
-            //释放锁
             lock.unlock();
         }
     }
@@ -73,12 +78,12 @@ public class VoucherOrderServiceImpl implements VoucherOrderService {
         Long userId = UserHolder.getUser().getId();
         boolean bought = voucherOrderRepository.existsByUserIdAndVoucherId(userId, voucherId);
         if (bought) {
-            return Result.fail("用户已经购买过一次！");
+            throw new BizException(ErrorCode.ALREADY_PURCHASED);
         }
 
         boolean success = seckillVoucherRepository.decreaseStock(voucherId) > 0;
         if (!success) {
-            return Result.fail("库存不足！");
+            throw new BizException(ErrorCode.STOCK_INSUFFICIENT);
         }
 
         VoucherOrder voucherOrder = new VoucherOrder();
@@ -90,9 +95,8 @@ public class VoucherOrderServiceImpl implements VoucherOrderService {
         voucherOrder.setPayType(1);
         voucherOrderRepository.save(voucherOrder);
 
+        log.info("Seckill order created: orderId={} userId={} voucherId={}",
+                orderId, userId, voucherId);
         return Result.ok(orderId);
     }
-
-
-
 }

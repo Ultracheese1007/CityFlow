@@ -18,6 +18,10 @@ e-commerce backend needs:
   seckill hot path — keeping order placement consistent under concurrent load
 - **Kafka** decouples order placement from persistence: the HTTP path stays
   on Redis-only checks while a consumer drains writes to MySQL asynchronously
+- **Structured error handling + traceId** — every request gets an 8-char
+    trace ID echoed in `X-Trace-Id`; failures return stable error codes like
+    `VOUCHER_NOT_FOUND` instead of free-text strings, so logs and clients
+    can branch reliably
 - **Docker Compose** for a one-command local stack;
   **GitHub Actions** ships the image to GHCR on every push to `main`
 
@@ -39,12 +43,40 @@ e-commerce backend needs:
 | Container | Docker + Compose | v2 | One-command local stack |
 | CI | GitHub Actions | — | Build + push image to GHCR |
 | Tests | JUnit 5 + Mockito | — | Unit & integration coverage |
+| Logging | SLF4J + Logback + MDC | — | Per-request traceId, structured exception logging |
 
 ## Quick start (5 minutes)
 
 
 
 ## API examples
+
+### Request a voucher that doesn't exist
+
+```bash
+$ curl -i -X POST http://localhost:8080/voucher-order/seckill/99999 \
+       -H "authorization: $TOKEN"
+
+HTTP/1.1 200
+X-Trace-Id: efab1825
+Content-Type: application/json
+
+{
+  "success": false,
+  "code": "VOUCHER_NOT_FOUND",
+  "errorMsg": "voucherId=99999"
+}
+```
+
+The `X-Trace-Id` header matches the `[efab1825]` tag in the application log:
+
+```
+WARN [efab1825] c.c.config.WebExceptionAdvice : Business exception: code=VOUCHER_NOT_FOUND msg=voucherId=99999
+```
+
+Customer-support hands the trace ID to ops; ops `grep` the log and
+retrieves the full request chain — JWT auth, service calls, Redis ops —
+under a single ID.
 
 
 
@@ -56,5 +88,5 @@ e-commerce backend needs:
 
 
 
-## What's next (roadmap)
+
 

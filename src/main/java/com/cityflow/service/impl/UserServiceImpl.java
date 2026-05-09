@@ -4,10 +4,12 @@ import cn.hutool.core.bean.BeanUtil;
 import com.cityflow.config.security.jwt.CookieUtil;
 import com.cityflow.config.security.jwt.JwtProps;
 import com.cityflow.config.security.jwt.JwtUtil;
+import com.cityflow.dto.ErrorCode;
 import com.cityflow.dto.LoginFormDTO;
 import com.cityflow.dto.Result;
 import com.cityflow.dto.UserDTO;
 import com.cityflow.entity.User;
+import com.cityflow.exception.BizException;
 import com.cityflow.repository.UserRepository;
 import com.cityflow.service.UserService;
 import com.cityflow.utils.RegexUtils;
@@ -15,15 +17,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
-
 
 import static com.cityflow.utils.RedisConstants.LOGIN_CODE_KEY;
 import static com.cityflow.utils.RedisConstants.LOGIN_CODE_TTL;
@@ -40,8 +41,10 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public Result sendCode(String phone, HttpSession session) {
-        if (RegexUtils.isPhoneInvalid(phone)) return Result.fail("手机号格式错误！");
-        String code = String.valueOf((int)((Math.random()*9 + 1) * 100000));
+        if (RegexUtils.isPhoneInvalid(phone)) {
+            throw new BizException(ErrorCode.INVALID_PHONE);
+        }
+        String code = String.valueOf((int) ((Math.random() * 9 + 1) * 100000));
         stringRedisTemplate.opsForValue().set(LOGIN_CODE_KEY + phone, code, LOGIN_CODE_TTL, TimeUnit.MINUTES);
         log.debug("发送短信验证码成功，验证码：{}", code);
         return Result.ok();
@@ -50,17 +53,21 @@ public class UserServiceImpl implements UserService {
     @Override
     public Result login(LoginFormDTO loginForm, HttpSession session) {
         String phone = loginForm.getPhone();
-        if (RegexUtils.isPhoneInvalid(phone)) return Result.fail("手机号格式错误！");
+        if (RegexUtils.isPhoneInvalid(phone)) {
+            throw new BizException(ErrorCode.INVALID_PHONE);
+        }
 
         String cacheCode = stringRedisTemplate.opsForValue().get(LOGIN_CODE_KEY + phone);
-        if (cacheCode == null || !cacheCode.equals(loginForm.getCode())) return Result.fail("验证码错误");
+        if (cacheCode == null || !cacheCode.equals(loginForm.getCode())) {
+            throw new BizException(ErrorCode.INVALID_CODE);
+        }
 
         // JPA 查询/创建
         User user = userRepository.findByPhone(phone).orElseGet(() -> createUserWithPhone(phone));
 
         // 签 Access
         UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
-        Map<String,Object> claims = new HashMap<>();
+        Map<String, Object> claims = new HashMap<>();
         claims.put("nickname", userDTO.getNickName());
         String access = JwtUtil.genAccess(
                 jwtProps.getSecret(),
@@ -69,7 +76,7 @@ public class UserServiceImpl implements UserService {
                 claims
         );
 
-        // 签 Refresh 并写入 HttpOnly Cookie —— 通过 RequestContextHolder 拿 response
+        // 签 Refresh 并写入 HttpOnly Cookie
         HttpServletResponse response = ((ServletRequestAttributes)
                 RequestContextHolder.currentRequestAttributes()).getResponse();
         if (response != null) {
@@ -91,7 +98,6 @@ public class UserServiceImpl implements UserService {
             log.warn("HttpServletResponse is null when setting refresh cookie.");
         }
 
-        // 返回体保持原样：data = access token 字符串
         return Result.ok(access);
     }
 
@@ -99,10 +105,8 @@ public class UserServiceImpl implements UserService {
         User user = new User();
         user.setPhone(phone);
         user.setNickName(USER_NICK_NAME_PREFIX + phone.substring(phone.length() - 4));
-        user.setPassword("");   // schema 里 NOT NULL DEFAULT '', service 层显式补齐
-        user.setIcon("");       // 同上
+        user.setPassword("");
+        user.setIcon("");
         return userRepository.save(user);
     }
-
-
 }
