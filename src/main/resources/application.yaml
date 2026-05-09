@@ -56,6 +56,21 @@ spring:
     cookie-secure: false     # 本地 false；生产 true
     cookie-same-site: "Lax"
 
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9093}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all                    # 等所有 in-sync replica 确认；demo 1 节点也无所谓，习惯成自然
+    consumer:
+      group-id: cityflow-app
+      auto-offset-reset: earliest  # 第一次启动从最早消息读，不漏掉
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        # JsonDeserializer 安全配置：信任反序列化的包
+        spring.json.trusted.packages: 'com.cityflow.kafka,java.util,java.lang'
+
 logging:
   level:
     com.cityflow: debug

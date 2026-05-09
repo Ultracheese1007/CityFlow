@@ -39,6 +39,43 @@ services:
       timeout: 5s
       retries: 5
 
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: cityflow-kafka
+    restart: unless-stopped
+    ports:
+      - "9093:9093"   # host 访问用（应用从 macOS 命令行跑测试时用这个）
+    environment:
+      # ---- KRaft 模式核心配置（不需要 Zookeeper）----
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:29093'
+      # ---- 关键：两个 listener ----
+      # 9092 给 docker 网络内的服务（cityflow-app 用 kafka:9092 连）
+      # 9093 给 host（macOS 命令行 / 测试 / EmbeddedKafka 用 localhost:9093 连）
+      KAFKA_LISTENERS: 'PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:29093,PLAINTEXT_HOST://0.0.0.0:9093'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9093'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      # 集群 ID——KRaft 必须固定。这是个 22 字符 base64 字符串，demo 写死即可
+      CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
+      # ---- demo 配置 ----
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'   # demo 偷懒，生产环境一定 false
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    networks:
+      - cityflow
+    healthcheck:
+      test: [ "CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
   cityflow-app:
     build: .
     image: cityflow:local
@@ -59,6 +96,7 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD:-change_me}
       # Flyway V3 里 ${dataDir} 的值 —— 容器内路径
       SPRING_FLYWAY_PLACEHOLDERS_DATADIR: /app/data
+      KAFKA_BOOTSTRAP: kafka:9092
     volumes:
       # TSV 数据要挂进 app 容器（LOAD DATA LOCAL INFILE 是客户端读的）
       - ./ops/flyway/data:/app/data:ro
@@ -67,6 +105,9 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      kafka:
+        condition: service_healthy
+
     networks:
       - cityflow
 
@@ -85,9 +126,11 @@ services:
     networks:
       - cityflow
 
+
 volumes:
   mysql_data:
   redis_data:
+  kafka_data:
 
 networks:
   cityflow:
