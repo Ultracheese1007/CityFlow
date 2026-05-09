@@ -54,7 +54,7 @@ e-commerce backend needs:
 
 ## API examples
 
-### Successful seckill 
+### Successful seckill (full happy path)
 
 ```bash
 $ time curl -i -X POST http://localhost:8080/voucher-order/seckill/3 \
