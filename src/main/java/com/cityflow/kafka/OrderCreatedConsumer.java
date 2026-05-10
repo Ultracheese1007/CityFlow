@@ -26,7 +26,7 @@ public class OrderCreatedConsumer {
     private final VoucherOrderRepository voucherOrderRepository;
     private final SeckillVoucherRepository seckillVoucherRepository;
 
-    @KafkaListener(topics = KafkaTopics.SECKILL_ORDER_CREATED, groupId = "cityflow-app")
+    @KafkaListener(topics = KafkaTopics.SECKILL_ORDER_CREATED, groupId = "${spring.kafka.consumer.group-id:cityflow-app}")
     @Transactional(rollbackFor = Exception.class)
     public void onOrderCreated(OrderCreatedEvent event) {
         log.info("Consuming order event: orderId={} userId={} voucherId={}",

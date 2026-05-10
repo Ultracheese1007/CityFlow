@@ -45,11 +45,21 @@ e-commerce backend needs:
 | Build | Maven | 3.x | Standard JVM build |
 | Container | Docker + Compose | v2 | One-command local stack |
 | CI | GitHub Actions | — | Build + push image to GHCR |
-| Tests | JUnit 5 + Mockito | — | Unit & integration coverage |
+| Tests | JUnit 5 + Mockito + EmbeddedKafka | — | 17 tests; consumer integration covered with embedded broker |
 | Logging | SLF4J + Logback + MDC | — | Per-request traceId, structured exception logging |
 
 ## Quick start (5 minutes)
+```bash
+git clone https://github.com/Ultracheese1007/CityFlow.git
+cd CityFlow
+docker compose up -d
+```
 
+App will be available at `http://localhost:8080`. The stack starts MySQL,
+Redis, Kafka (KRaft mode), Nginx, and the Spring Boot app, with Flyway
+auto-applying schema migrations on first run.
+
+To run tests: `./mvnw test` (no docker needed — uses H2 + EmbeddedKafka).
 
 
 ## API examples
@@ -103,8 +113,9 @@ under one tag.
 
 
 ## Project structure
+```
 
-
+```
 
 ## Troubleshooting
 
