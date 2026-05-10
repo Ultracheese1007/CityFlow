@@ -27,6 +27,8 @@ e-commerce backend needs:
     can branch reliably
 - **Docker Compose** for a one-command local stack;
   **GitHub Actions** ships the image to GHCR on every push to `main`
+- - **Spring Boot Actuator** — `/actuator/health` + `/actuator/info` for ops
+    visibility and Kubernetes-style liveness/readiness probes
 
 ## Tech stack
 
@@ -49,17 +51,31 @@ e-commerce backend needs:
 | Logging | SLF4J + Logback + MDC | — | Per-request traceId, structured exception logging |
 
 ## Quick start (5 minutes)
+
 ```bash
 git clone https://github.com/Ultracheese1007/CityFlow.git
 cd CityFlow
 docker compose up -d
 ```
 
-App will be available at `http://localhost:8080`. The stack starts MySQL,
-Redis, Kafka (KRaft mode), Nginx, and the Spring Boot app, with Flyway
-auto-applying schema migrations on first run.
+The stack boots MySQL, Redis, Kafka (KRaft mode), Nginx, and the Spring Boot
+app, with Flyway auto-applying schema migrations on first run.
 
-To run tests: `./mvnw test` (no docker needed — uses H2 + EmbeddedKafka).
+Verify the app is healthy:
+
+```bash
+$ curl -s http://localhost:8080/actuator/health
+{"status":"UP"}
+
+$ curl -s http://localhost:8080/actuator/info
+{"app":{"name":"CityFlow","description":"City review & seckill platform with async Kafka order pipeline","version":"0.1.0"},"java":{"version":17}}
+```
+
+To run the test suite (no Docker required — uses H2 + EmbeddedKafka):
+
+```bash
+./mvnw test
+```
 
 
 ## API examples
@@ -113,11 +129,37 @@ under one tag.
 
 
 ## Project structure
-```
+## Project structure
 
 ```
-
-## Troubleshooting
+.
+├── docker-compose.yml          # MySQL + Redis + Kafka + Nginx + app
+├── Dockerfile                  # Spring Boot fat jar runtime image
+├── pom.xml
+├── ops/
+│   ├── flyway/                 # Seed data + Python script for legacy TSV imports
+│   └── nginx/                  # Upstream config + static assets + access logs
+├── src/
+│   ├── main/
+│   │   ├── java/com/cityflow/
+│   │   │   ├── controller/     # REST endpoints
+│   │   │   ├── service/        # Business logic (interfaces + impl)
+│   │   │   ├── repository/     # Spring Data JPA repos
+│   │   │   ├── entity/         # JPA entities
+│   │   │   ├── dto/            # Request/response DTOs + ErrorCode enum
+│   │   │   ├── kafka/          # OrderCreatedEvent, consumer, topics, stock initializer
+│   │   │   ├── config/
+│   │   │   │   ├── kafka/      # DefaultErrorHandler + DLT routing
+│   │   │   │   ├── security/   # JWT filter + auth entry point
+│   │   │   │   └── web/        # TraceIdFilter (MDC), CORS, global exception advice
+│   │   │   ├── exception/      # BizException hierarchy
+│   │   │   └── utils/          # RedisConstants, UserHolder, key builders
+│   │   └── resources/
+│   │       ├── application.yaml
+│   │       └── db/migration/   # Flyway versioned migrations (V1__, V2__, ...)
+│   └── test/                   # 17 tests: unit, repository, EmbeddedKafka integration
+└── .github/workflows/          # CI: build + test + image push to GHCR
+```
 
 
 
