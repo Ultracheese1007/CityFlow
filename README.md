@@ -1,4 +1,8 @@
 # CityFlow
+[![CI](https://github.com/Ultracheese1007/CityFlow/actions/workflows/ci.yml/badge.svg)](https://github.com/Ultracheese1007/CityFlow/actions/workflows/ci.yml)
+![Java](https://img.shields.io/badge/Java-17-blue)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-2.7-brightgreen)
+![Tests](https://img.shields.io/badge/tests-17%20passing-success)
 
 > A modular backend for a city review & seckill platform. Built to demonstrate
 > Redis-backed distributed locking, JPA/Flyway-managed schema, JWT auth, and
@@ -29,6 +33,7 @@ e-commerce backend needs:
   **GitHub Actions** ships the image to GHCR on every push to `main`
 - - **Spring Boot Actuator** — `/actuator/health` + `/actuator/info` for ops
     visibility and Kubernetes-style liveness/readiness probes
+- See [docs/DESIGN.md](docs/DESIGN.md) for architecture decisions and [docs/DEMO.md](docs/DEMO.md) for a 5-minute walkthrough.
 
 ## Architecture
 
