@@ -30,6 +30,113 @@ e-commerce backend needs:
 - - **Spring Boot Actuator** — `/actuator/health` + `/actuator/info` for ops
     visibility and Kubernetes-style liveness/readiness probes
 
+## Architecture
+
+```mermaid
+flowchart LR
+    User([User<br/>browser / curl])
+
+    subgraph Edge["Edge"]
+        Nginx[Nginx<br/>:18081]
+    end
+
+    subgraph App["Application"]
+        Boot[Spring Boot<br/>:18080]
+        Filters[JWT filter +<br/>TraceId filter]
+        Consumer[Kafka Consumer<br/>OrderCreatedConsumer]
+        Boot --- Filters
+        Boot -.-> Consumer
+    end
+
+    subgraph Data["Data plane"]
+        Redis[(Redis 7<br/>stock + dedup set)]
+        MySQL[(MySQL 8<br/>orders + vouchers)]
+        Kafka[(Kafka KRaft<br/>seckill.order-created)]
+    end
+
+    User -->|HTTPS| Nginx
+    Nginx -->|HTTP| Boot
+
+    Boot -->|"① DECR stock<br/>② SADD user"| Redis
+    Boot -->|"③ publish<br/>OrderCreatedEvent"| Kafka
+    Boot -->|"reads (cache miss)"| MySQL
+
+    Kafka -->|"④ consume"| Consumer
+    Consumer -->|"⑤ idempotent INSERT<br/>+ DB stock DECR"| MySQL
+
+    Kafka -.->|"failed × 3 retries"| DLT[(seckill.order-created.DLT)]
+
+    classDef edge fill:#fde68a,stroke:#a16207,color:#000
+    classDef app fill:#bfdbfe,stroke:#1d4ed8,color:#000
+    classDef data fill:#bbf7d0,stroke:#15803d,color:#000
+    class Nginx edge
+    class Boot,Filters,Consumer app
+    class Redis,MySQL,Kafka,DLT data
+```
+
+**Reading guide**: The seckill path is split. Steps ①②③ happen on the HTTP
+thread (~27 ms) — Redis enforces correctness atomically and Kafka acts as a
+durable buffer. Steps ④⑤ drain asynchronously to MySQL with idempotent
+inserts, smoothing DB write pressure. Failed events route to a dead-letter
+topic after 3 retries.
+
+### Seckill request flow
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Client
+    participant N as Nginx
+    participant A as Spring Boot
+    participant R as Redis
+    participant K as Kafka
+    participant Q as Consumer
+    participant M as MySQL
+
+    C->>N: POST /voucher-order/seckill/{id}<br/>authorization: <JWT>
+    N->>A: forward
+    A->>A: TraceId filter (X-Trace-Id)<br/>JWT filter (auth)
+
+    rect rgb(254, 249, 195)
+    Note over A,R: Hot path — Redis only (~27 ms)
+    A->>R: DECR stock:{voucherId}
+    R-->>A: remaining stock
+    alt stock < 0
+        A->>R: INCR stock:{voucherId} (compensate)
+        A-->>C: 200 {success:false, code:STOCK_INSUFFICIENT}
+    end
+    A->>R: SADD order:{voucherId} userId
+    R-->>A: 0 (already exists) or 1 (new)
+    alt already member
+        A->>R: INCR stock:{voucherId} (compensate)
+        A-->>C: 200 {success:false, code:ALREADY_PURCHASED}
+    end
+    A->>A: snowflake orderId
+    A->>K: send OrderCreatedEvent(orderId, userId, voucherId)
+    A-->>C: 200 {success:true, data: orderId}
+    end
+
+    rect rgb(220, 252, 231)
+    Note over Q,M: Cold path — async drain (~550 ms later)
+    K-->>Q: poll(OrderCreatedEvent)
+    Q->>M: existsById(orderId)?
+    M-->>Q: false
+    Q->>M: UPDATE tb_seckill_voucher SET stock=stock-1
+    Q->>M: INSERT INTO tb_voucher_order
+    Note over Q: On exception:<br/>3 retries × 1s, then publish to DLT
+    end
+```
+
+**Key properties**:
+- **Atomic correctness in Redis** — `DECR` + `SADD` are single-key atomic
+  ops; compensating `INCR` on failure keeps the counter consistent
+- **Bounded HTTP latency** — 1 Redis RTT + 1 Kafka send + return; no DB I/O
+  on the request thread
+- **Idempotent consumer** — `existsById` guards against Kafka redelivery,
+  so at-least-once delivery becomes effective exactly-once at the app layer
+- **Failure isolation** — bad events go to the DLT after 3 retries, never
+  block the main topic
+
 ## Tech stack
 
 | Layer | Choice | Version | Why |
@@ -128,7 +235,6 @@ retrieves JWT auth, Service calls, Redis operations, and any errors
 under one tag.
 
 
-## Project structure
 ## Project structure
 
 ```
